@@ -21,6 +21,6 @@ app.use(cors());
 app.use(express.json());
 app.use(`${ROUTE_ROOT}${ROUTE_FOOD}`, foodRouter);
 
-app.listen(PORT, () => {
+app.listen(PORT, "192.168.0.14", () => {
   console.log(`Listening on port ${PORT}`);
 });

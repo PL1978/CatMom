@@ -6,4 +6,5 @@ export const foodRouter = express.Router();
 
 foodRouter.get("/", async (req: Request, res: Response) => {
   res.status(200).send({"message" :"nouriture"});
+  console.log("food");
 });
