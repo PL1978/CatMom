@@ -1,13 +1,12 @@
 import { DynamoDBClient, ScanCommand } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { unmarshall } from "@aws-sdk/util-dynamodb";
-import { MealTime, TABLE_NAME, } from "../../model/MealTime";
+import { MealTimeItem, TABLE_NAME, } from "../../model/item/mealTime.item";
+import { createClient, getItem } from "./dynamoDB.dao";
 
+const docClient = createClient();
 
-const client = new DynamoDBClient({region:"us-east-2"});
-const docClient = DynamoDBDocumentClient.from(client);
-
-export async function getAllWithValueSmallerAndValueDifferent(smallerAttr: string, smallerValue:number, difAttr: string, diffValue: number): Promise<MealTime | undefined> {
+export async function getFirstWithValueSmallerAndValueDifferent(smallerAttr: string, smallerValue:number, difAttr: string, diffValue: number): Promise<MealTimeItem | undefined> {
     const scanCommand = new ScanCommand({
         TableName: TABLE_NAME,
         FilterExpression: `#smallerAttr <= :smallerValue AND #difAttr <> :diffValue`,
@@ -22,16 +21,12 @@ export async function getAllWithValueSmallerAndValueDifferent(smallerAttr: strin
       });
     
       const response = await docClient.send(scanCommand);
-      
-      return typeof response.Items === "undefined" || typeof response.Items!.at(0) === "undefined" ? undefined : unmarshall(response.Items.at(0)!) as MealTime;
+      return typeof response.Items === "undefined" || typeof response.Items!.at(0) === "undefined" ? undefined : unmarshall(response.Items.at(0)!) as MealTimeItem;
 }
 
 export async function updateAttrValueWithID(id: number, attr: string, value: number) : Promise<number|undefined> {
-  const getCommand = new GetCommand({
-    TableName: TABLE_NAME,
-    Key: {id: id}
-  });
-  const existingItem = await client.send(getCommand);
+  const existingItem = await getItem(TABLE_NAME, id, docClient);
+
   let itemUpdatedID = undefined;
   if (typeof existingItem.Item !== "undefined") {
     const updateCommand = new UpdateCommand({
@@ -41,7 +36,7 @@ export async function updateAttrValueWithID(id: number, attr: string, value: num
       ExpressionAttributeNames: { '#attrName': attr },
       ExpressionAttributeValues: { ':attrValue': value.toString() },
     });
-    client.send(updateCommand);
+    docClient.send(updateCommand);
     itemUpdatedID = id;
   }
 

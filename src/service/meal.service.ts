@@ -1,11 +1,22 @@
-import { MealTime } from "../model/MealTime";
-import { getAllWithValueSmallerAndValueDifferent, updateAttrValueWithID} from "./dao/food.dao";
+import { ParameterItem, TABLE_ID } from "../model/item/parameter.item";
+import { getFirstWithValueSmallerAndValueDifferent, updateAttrValueWithID} from "./dao/meal.dao";
+import { getParameter } from "./dao/parameter.dao";
 
 
-export async function getCurrentMeal() : Promise<MealTime | undefined> {
+export async function getDueMeal() : Promise<ParameterItem | undefined> {
     const currentDate = new Date();
     const currentMinuteOfDay = currentDate.getHours() * 60 + currentDate.getMinutes();
-    return await getAllWithValueSmallerAndValueDifferent("schedule", currentMinuteOfDay, "last", currentDate.getDay());
+    const dueMeal = await getFirstWithValueSmallerAndValueDifferent("schedule", currentMinuteOfDay, "last", currentDate.getDay());
+    let formatedDueMeal = undefined;
+    if (typeof dueMeal !== "undefined") {
+        let params = await getParameter(TABLE_ID);
+        if (typeof params === "undefined") {
+            throw new Error("No params in db");
+        }
+        formatedDueMeal = params;
+        formatedDueMeal.id = dueMeal.id;
+    }
+    return formatedDueMeal;
 }
 
 export async function mealFed(id: number): Promise<number|undefined> {
