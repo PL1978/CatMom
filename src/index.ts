@@ -2,7 +2,7 @@ import * as dotenv from "dotenv";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
-import { foodRouter, ROUTE_FOOD } from "./controller/food.router";
+import { foodRouter, ROUTE_FOOD } from "./controller/meal.router";
 
 
 dotenv.config();
