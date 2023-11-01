@@ -1,10 +1,16 @@
 
+import { Console } from "console";
 import express, { Request, Response } from "express";
-import { getDueMeal, mealFed } from "../service/meal.service";
-import { logErrorReq as logReqError } from "../util/utilities";
+import { createMeal, getDueMeal, mealFed } from "../service/meal.service";
+import { logReqError as logReqError } from "../util/utilities";
+import { unknownError } from "./router";
 
-export const ROUTE_FOOD = "/meal";
+export const ROUTE_MEAL = "/meal";
 export const foodRouter = express.Router();
+
+const NO_BODY_MESSAGE = "no body provided";
+const NO_DATE_MESSAGE = "no date in provided body";
+const BAD_DATE_MESSAGE = `bad date format, use ${new Date(1)}`;
 
 
 foodRouter.get("/", async (req:Request, res: Response) => {
@@ -18,39 +24,36 @@ foodRouter.get("/", async (req:Request, res: Response) => {
       resBody= meal;
     }
   } catch (error) {
-    console.error(error);
-    logReqError(req, ROUTE_FOOD);
-    res.status(500)
+    unknownError(req, res, error, ROUTE_MEAL);
   }
   res.send(resBody);
 });
 
 foodRouter.post("/", async (req: Request, res: Response) => {
   res.status(400);
-  if (typeof req.body.id === "undefined") {
-    console.error("request without id");
-    logReqError(req, ROUTE_FOOD);
-
+  let resMessage = "";
+  if (typeof req.body === "undefined" ) {
+    resMessage = NO_BODY_MESSAGE;
+    logReqError(req, ROUTE_MEAL);
   } else {
-    const id = parseInt(req.body.id);
-    if (isNaN(id)) {
-      console.error("bad id format, use numerical value");
-      logReqError(req, ROUTE_FOOD);
-
+    if (typeof req.body.schedule === "undefined") {
+      resMessage = NO_DATE_MESSAGE;
+      logReqError(req, ROUTE_MEAL);
     } else {
-      try {
-        const updatedItemID = await mealFed(id);
-        if (typeof updatedItemID === "undefined") {
-          res.status(204);
-        } else {
-          res.status(200);
+      const reqSchedule = new Date(req.body.schedule);
+      if (isNaN(reqSchedule.getTime())) {
+        resMessage = BAD_DATE_MESSAGE;
+        logReqError(req, ROUTE_MEAL);
+      } else {
+        try {
+          createMeal(reqSchedule);
+          res.status(200)
+        } catch (error) {
+          unknownError(req, res, error, ROUTE_MEAL);
         }
-      } catch (error) {
-        res.status(500);
-        console.error(`error while posting request :\n${error}`);
-        logReqError(req, ROUTE_FOOD);
+        
       }
     }
-  }
-  res.send();
+  } 
+  res.send(resMessage);
 });

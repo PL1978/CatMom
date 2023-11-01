@@ -2,7 +2,7 @@ import * as dotenv from "dotenv";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
-import { foodRouter, ROUTE_FOOD } from "./controller/meal.router";
+import { foodRouter, ROUTE_MEAL } from "./controller/meal.router";
 
 
 dotenv.config();
@@ -19,7 +19,7 @@ const app = express();
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-app.use(`${ROUTE_ROOT}${ROUTE_FOOD}`, foodRouter);
+app.use(`${ROUTE_ROOT}${ROUTE_MEAL}`, foodRouter);
 
 app.listen(PORT, () => {
   console.log(`Listening on port ${PORT}`);

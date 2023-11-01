@@ -1,10 +1,18 @@
-import { DynamoDBClient, ScanCommand } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { ScanCommand } from "@aws-sdk/client-dynamodb";
+import { PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { unmarshall } from "@aws-sdk/util-dynamodb";
 import { MealTimeItem, TABLE_NAME, } from "../../model/item/mealTime.item";
 import { createClient, getItem } from "./dynamoDB.dao";
 
 const docClient = createClient();
+
+export function addMeal(toAdd: MealTimeItem) {
+  const addCommand = new PutCommand({
+    TableName: TABLE_NAME,
+    Item: toAdd
+  });
+  docClient.send(addCommand);
+}
 
 export async function getFirstWithValueSmallerAndValueDifferent(smallerAttr: string, smallerValue:number, difAttr: string, diffValue: number): Promise<MealTimeItem | undefined> {
     const scanCommand = new ScanCommand({

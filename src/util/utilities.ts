@@ -1,6 +1,6 @@
 import { Request } from "express";
 
-export function logErrorReq(req : Request, path: string) {
+export function logReqError(req : Request, path: string) {
     console.error(`${new Date()}
     ip ${req.ip}
     path ${path}${JSON.stringify(req.url)}
