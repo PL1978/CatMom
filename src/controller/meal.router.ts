@@ -1,59 +1,59 @@
 
-import { Console } from "console";
 import express, { Request, Response } from "express";
-import { createMeal, getDueMeal, mealFed } from "../service/meal.service";
+import { createMeal, deleteMeal, getAllMeals } from "../service/meal.service";
 import { logReqError as logReqError } from "../util/utilities";
-import { unknownError } from "./router";
+import { bodyValidation, unknownError } from "./router";
 
 export const ROUTE_MEAL = "/meal";
-export const foodRouter = express.Router();
+export const mealRouter = express.Router();
 
-const NO_BODY_MESSAGE = "no body provided";
-const NO_DATE_MESSAGE = "no date in provided body";
+
+
 const BAD_DATE_MESSAGE = `bad date format, use ${new Date(1)}`;
 
 
-foodRouter.get("/", async (req:Request, res: Response) => {
-  let resBody = undefined;
+mealRouter.get("/", async (req: Request, res: Response) => {
+  
   try {
-    const meal = await getDueMeal();
-    if (typeof meal === "undefined") {
-      res.status(204)
-    } else {
-      res.status(200)
-      resBody= meal;
-    }
+    res.status(200);
+    res.send(await getAllMeals());
   } catch (error) {
     unknownError(req, res, error, ROUTE_MEAL);
+    res.send();
   }
-  res.send(resBody);
+  
 });
 
-foodRouter.post("/", async (req: Request, res: Response) => {
-  res.status(400);
-  let resMessage = "";
-  if (typeof req.body === "undefined" ) {
-    resMessage = NO_BODY_MESSAGE;
-    logReqError(req, ROUTE_MEAL);
-  } else {
-    if (typeof req.body.schedule === "undefined") {
-      resMessage = NO_DATE_MESSAGE;
+mealRouter.post("/", async (req: Request, res: Response) => {
+  if (bodyValidation(req, res, ["schedule"], ROUTE_MEAL)) {
+    const reqSchedule = new Date(req.body.schedule);
+    if (isNaN(reqSchedule.getTime())) {
+      res.status(400);
+      res.send(BAD_DATE_MESSAGE);
       logReqError(req, ROUTE_MEAL);
     } else {
-      const reqSchedule = new Date(req.body.schedule);
-      if (isNaN(reqSchedule.getTime())) {
-        resMessage = BAD_DATE_MESSAGE;
-        logReqError(req, ROUTE_MEAL);
-      } else {
-        try {
-          createMeal(reqSchedule);
-          res.status(200)
-        } catch (error) {
-          unknownError(req, res, error, ROUTE_MEAL);
-        }
-        
+      try {
+        createMeal(reqSchedule);
+        res.status(200);
+        res.send();
+      } catch (error) {
+        unknownError(req, res, error, ROUTE_MEAL);
       }
     }
-  } 
-  res.send(resMessage);
+  }
+  
+});
+
+mealRouter.delete("/", async (req: Request, res: Response) => {
+  if (bodyValidation(req, res, ["id"], ROUTE_MEAL)) {
+    const id = parseInt(req.body.id);
+    if (isNaN(id)) {
+      res.status(400);
+      res.send("Bad id, please provide a number");
+    } else {
+      deleteMeal(id);
+      res.status(200);
+      res.send();
+    }
+  }
 });

@@ -1,17 +1,32 @@
 import { ScanCommand } from "@aws-sdk/client-dynamodb";
-import { PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { unmarshall } from "@aws-sdk/util-dynamodb";
+import { LookupAllOptions } from "dns";
 import { MealTimeItem, TABLE_NAME, } from "../../model/item/mealTime.item";
 import { createClient, getItem } from "./dynamoDB.dao";
 
 const docClient = createClient();
 
-export function addMeal(toAdd: MealTimeItem) {
+export function add(toAdd: MealTimeItem) {
   const addCommand = new PutCommand({
     TableName: TABLE_NAME,
     Item: toAdd
   });
   docClient.send(addCommand);
+}
+
+export async function getAll(): Promise<Array<MealTimeItem>> {
+  const getCommand = new ScanCommand({
+    TableName: TABLE_NAME
+  });
+  const all = await docClient.send(getCommand);
+  let allMeals: Array<MealTimeItem>;
+  if (typeof all.Items === "undefined") {
+    allMeals = new Array();
+   } else {
+     allMeals = all.Items.map((mealItem: Record<string, any>) => unmarshall(mealItem) as MealTimeItem);
+   }
+  return allMeals;
 }
 
 export async function getFirstWithValueSmallerAndValueDifferent(smallerAttr: string, smallerValue:number, difAttr: string, diffValue: number): Promise<MealTimeItem | undefined> {
@@ -42,11 +57,20 @@ export async function updateAttrValueWithID(id: number, attr: string, value: num
       Key: {id: id},
       UpdateExpression: 'SET #attrName = :attrValue',
       ExpressionAttributeNames: { '#attrName': attr },
-      ExpressionAttributeValues: { ':attrValue': value.toString() },
+      ExpressionAttributeValues: { ':attrValue': value },
     });
     docClient.send(updateCommand);
     itemUpdatedID = id;
   }
-
   return itemUpdatedID;
+}
+
+export function remove(id :number) {
+    const deleteCommand = new DeleteCommand({
+      TableName: TABLE_NAME,
+      Key: {
+        id: id
+      }
+    });
+    docClient.send(deleteCommand);
 }

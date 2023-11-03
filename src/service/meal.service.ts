@@ -1,6 +1,6 @@
 import { MealTimeItem } from "../model/item/mealTime.item";
 import { ParameterItem, TABLE_ID } from "../model/item/parameter.item";
-import { addMeal, getFirstWithValueSmallerAndValueDifferent, updateAttrValueWithID} from "./dao/meal.dao";
+import { add, getAll, getFirstWithValueSmallerAndValueDifferent, remove, updateAttrValueWithID} from "./dao/meal.dao";
 import { getParameter } from "./dao/parameter.dao";
 
 function dateToNumber(date:Date): number {
@@ -13,7 +13,11 @@ export function createMeal(feedTime: Date) {
         last : -1,
         schedule : dateToNumber(feedTime)
     }
-    addMeal(meal);
+    add(meal);
+}
+
+export function getAllMeals(): Promise<Array<MealTimeItem>> {
+    return getAll();
 }
 
 export async function getDueMeal() : Promise<ParameterItem | undefined> {
@@ -35,4 +39,8 @@ export async function getDueMeal() : Promise<ParameterItem | undefined> {
 export async function mealFed(id: number): Promise<number|undefined> {
     const currentDate = new Date();
     return await updateAttrValueWithID(id, "last", currentDate.getDay());
+}
+
+export function deleteMeal(id: number) {
+    remove(id);
 }
