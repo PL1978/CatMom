@@ -1,5 +1,3 @@
-import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { unmarshall } from "@aws-sdk/util-dynamodb";
 import { ParameterItem, TABLE_NAME } from "../../model/item/parameter.item";
 import { createClient, getItem } from "./dynamoDB.dao";
 

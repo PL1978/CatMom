@@ -25,6 +25,6 @@ app.use(`${ROUTE_ROOT}${ROUTE_MEAL_DUE}`, mealDueRouter);
 app.use(`${ROUTE_ROOT}${ROUTE_MEAL_FED}`, mealFedRouter);
 app.use(`${ROUTE_ROOT}${ROUTE_MEAL}`, mealRouter);
 
-app.listen(PORT, () => {
+app.listen(PORT, "192.168.0.14", () => {
   console.log(`Started on port ${PORT}`);
 });
