@@ -4,6 +4,14 @@
 #include <ArduinoJson.h>
 #include <setjmp.h>
 #include <stdio.h>
+/*
+ESP       45 mA
+Servo     150 mA
+HC_SR601  1 ma
+*/
+
+// réserver un espace de 8192 pour le token
+// utiliser un json document de 9000
 
 jmp_buf buf;
 
@@ -94,8 +102,7 @@ void confirmFeed(uint id) {
         Serial.print(", Error code is ");
         Serial.println(httpResponseCode);
         signalError();
-        //delay(1800000);
-        delay(3000);
+        delay(1800000);
       } else {
         Serial.print("Meal fed posted with body ");
         Serial.println(serializedBody);
@@ -108,7 +115,7 @@ void confirmFeed(uint id) {
 }
 
 gotMeal_t* getDueMeal() {
-  gotMeal_t* dueMeal = (gotMeal_t*)malloc(sizeof(gotMeal_t));
+  gotMeal_t* dueMeal = new gotMeal_t;
   dueMeal->isMealDue = false;
 
   HTTPClient http;
