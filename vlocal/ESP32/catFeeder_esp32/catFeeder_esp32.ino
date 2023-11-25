@@ -2,11 +2,23 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
-#include "time.h"
 #include <setjmp.h>
 #include <stdio.h>
 #include <string>
+#include <Preferences.h>
+#include <ctime>
 
+/**
+- extraire la logique des endpoints action et log
+- get time retries
+- écrire dans la flash
+*/
+
+typedef struct scheduledMeal scheduledMeal_t;
+typedef struct dailyMeal dailyMeal_t;
+typedef struct log log_t;
+
+Preferences flash;
 jmp_buf buf;
 
 Servo foodValve;
@@ -18,10 +30,9 @@ const uint8_t ERROR_LED_PIN = 25;
 const uint8_t OPEN_ANGLE = 16;
 const uint8_t CLOSE_ANGLE = 35;
 
-const char* ESTERN_TZ = "EST5EDT,M3.2.0,M11.1.0";
-const char* NTP_SERVER = "pool.ntp.org";
 const char* SSID = "FIZZ84084";
 const char* PSWD = "Colocation21*";
+const size_t MEAL_BODY_SIZE = 64;
 
 IPAddress local_IP(192, 168, 0, 184);
 IPAddress gateway(192, 168, 0, 1);
@@ -30,26 +41,16 @@ IPAddress dns(1, 1, 1, 1);
 
 AsyncWebServer server(80);
 
-typedef struct scheduledMeal {
-  uint8_t mealHour;
-  ushort openTime;
-} scheduledMeal_t;
+const char* FS_GROUP = "CATMOM";
+const char* FS_MEAL_NB = "mealCount";
+const char* FS_MEALS = "meals";
 
-void signalError() {
-  digitalWrite(ERROR_LED_PIN, HIGH);
-}
-
-void clearError() {
-  digitalWrite(ERROR_LED_PIN, LOW);
-}
-
-void feed(ushort openAngle, ushort closeAngle, uint openTime) {
+void feed(ushort openTime) {
   digitalWrite(ALIM_SERVO_PIN, HIGH);
-  foodValve.write(openAngle);
+  foodValve.write(OPEN_ANGLE);
   delay(openTime);
-  foodValve.write(closeAngle);
+  foodValve.write(CLOSE_ANGLE);
   delay(200);
-
   digitalWrite(ALIM_SERVO_PIN, LOW);
 }
 
@@ -61,16 +62,18 @@ JsonVariant getJsonValue(const char* key, StaticJsonDocument<capacity>& document
     return document[key];
   } else {
     failedBodyField = key;
-    Serial.print("unexpected body missing key ");
-    Serial.println(key);
-    signalError();
+    signalError("EKEY");
     longjmp(buf, 1);
   }
 }
 
 void setup() {
   Serial.begin(115200);
-  
+
+  pinMode(ALIM_SERVO_PIN, OUTPUT);
+  pinMode(ERROR_LED_PIN, OUTPUT);
+  foodValve.attach(SERVO_PIN);
+
   WiFi.begin(SSID, PSWD);
   Serial.println("Connecting");
   while(WiFi.status() != WL_CONNECTED) {
@@ -78,61 +81,33 @@ void setup() {
     Serial.print(WiFi.status());
     Serial.print(" ");
   }
-  
+  Serial.print("\n");
   if (!WiFi.config(local_IP, gateway, subnet, dns)) {
     Serial.println("STA Failed to configure");
+  } else {
+    Serial.println(WiFi.localIP());
+  }
+  struct tm currentTime;
+  if(adjustRTC(currentTime, false)) {
+    loadMealFromFlash(currentTime);
   }
   
+  server.on("/api/meal", HTTP_POST, [] (AsyncWebServerRequest * request) {}, NULL, handlePostMeal);
+  server.on("/api/meal", HTTP_DELETE, handleDeleteMeal);
+  server.on("/api/meal", HTTP_GET, handleGetMeal);
 
-  pinMode(ALIM_SERVO_PIN, OUTPUT);
-  pinMode(ERROR_LED_PIN, OUTPUT);
-  foodValve.attach(SERVO_PIN);
-
-  configTime(0, 0, NTP_SERVER);
-  setenv("TZ", ESTERN_TZ, 1); // Change this to your timezone string
-  tzset();
-  struct tm timeinfo;
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
-  } else {
-    Serial.print("Year: ");
-    Serial.println(timeinfo.tm_year + 1900);
-    Serial.print("Month: ");
-    Serial.println(timeinfo.tm_mon + 1);
-    Serial.print("Day: ");
-    Serial.println(timeinfo.tm_mday);
-    Serial.print("Hour: ");
-    Serial.println(timeinfo.tm_hour);
-    Serial.print("Minute: ");
-    Serial.println(timeinfo.tm_min);
-    Serial.print("Second: ");
-    Serial.println(timeinfo.tm_sec);
-  }
-  server.on("/api/meal", HTTP_POST, [] (AsyncWebServerRequest * request) {}, NULL, [] (AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
-    StaticJsonDocument<64> mealBody;
-    std::string body(reinterpret_cast<char*>(data), len);
-    scheduledMeal_t postedMeal;
-
-    if (setjmp(buf)) {
-      request->send(400, "text/plain", (std::string("Missing field ") + failedBodyField).c_str());
-    } else {
-      DeserializationError error = deserializeJson(mealBody, body);
-      if (error) {
-        request->send(500, "text/plain", (std::string("Error while parsing json body: ") + error.c_str()).c_str());
-      } else {
-        postedMeal.mealHour = getJsonValue("mealHour", mealBody).as<uint8_t>();
-        postedMeal.openTime = getJsonValue("openTime", mealBody).as<ushort>();
-        Serial.println(postedMeal.mealHour);
-        Serial.println(postedMeal.openTime);
-        request->send(200);
-      }
-    }
-    mealBody.clear();
-    
-  });
+  server.on("/api/log/error", HTTP_GET, handleGetErrorLog);
+  server.on("/api/log/action", HTTP_GET, handleGetActionLog);
 
   server.begin();
+  Serial.println("ready");
 }
 
 void loop() {
+  delay(5000);
+  struct tm currentTime;
+  if(setCurrentTime(currentTime)) { 
+    adjustRTCIfNeeded(currentTime);
+    feedIfMealDue(currentTime);
+  }
 }
