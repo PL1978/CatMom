@@ -5,20 +5,12 @@
 #include <setjmp.h>
 #include <stdio.h>
 #include <string>
-#include <Preferences.h>
 #include <ctime>
-
-/**
-- extraire la logique des endpoints action et log
-- get time retries
-- écrire dans la flash
-*/
 
 typedef struct scheduledMeal scheduledMeal_t;
 typedef struct dailyMeal dailyMeal_t;
 typedef struct log log_t;
 
-Preferences flash;
 jmp_buf buf;
 
 Servo foodValve;
@@ -32,7 +24,6 @@ const uint8_t CLOSE_ANGLE = 35;
 
 const char* SSID = "FIZZ84084";
 const char* PSWD = "Colocation21*";
-const size_t MEAL_BODY_SIZE = 64;
 
 IPAddress local_IP(192, 168, 0, 184);
 IPAddress gateway(192, 168, 0, 1);
@@ -41,9 +32,19 @@ IPAddress dns(1, 1, 1, 1);
 
 AsyncWebServer server(80);
 
-const char* FS_GROUP = "CATMOM";
-const char* FS_MEAL_NB = "mealCount";
-const char* FS_MEALS = "meals";
+void signalReady() {
+  
+  Serial.println("ready");
+  if (digitalRead(ERROR_LED_PIN) == HIGH) {
+    digitalWrite(ERROR_LED_PIN, LOW);
+    delay(3000);
+    digitalWrite(ERROR_LED_PIN, HIGH);
+  } else {
+    digitalWrite(ERROR_LED_PIN, HIGH);
+    delay(3000);
+    digitalWrite(ERROR_LED_PIN, LOW);
+  }
+}
 
 void feed(ushort openTime) {
   digitalWrite(ALIM_SERVO_PIN, HIGH);
@@ -76,10 +77,12 @@ void setup() {
 
   WiFi.begin(SSID, PSWD);
   Serial.println("Connecting");
+  resetRetry();
   while(WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(WiFi.status());
     Serial.print(" ");
+    resetIfRetryExceeded();
   }
   Serial.print("\n");
   if (!WiFi.config(local_IP, gateway, subnet, dns)) {
@@ -87,10 +90,15 @@ void setup() {
   } else {
     Serial.println(WiFi.localIP());
   }
+  
+  resetRetry();
   struct tm currentTime;
-  if(adjustRTC(currentTime, false)) {
-    loadMealFromFlash(currentTime);
+  while(!adjustRTC(currentTime)) {
+    delay(5000);
+    resetIfRetryExceeded();
   }
+
+  loadMealFromFlash(currentTime);
   
   server.on("/api/meal", HTTP_POST, [] (AsyncWebServerRequest * request) {}, NULL, handlePostMeal);
   server.on("/api/meal", HTTP_DELETE, handleDeleteMeal);
@@ -100,14 +108,21 @@ void setup() {
   server.on("/api/log/action", HTTP_GET, handleGetActionLog);
 
   server.begin();
-  Serial.println("ready");
+  signalReady();
 }
 
+#define FAIL_GET_TIME_DELAY 300000 // 5 mins
 void loop() {
-  delay(5000);
+
   struct tm currentTime;
   if(setCurrentTime(currentTime)) { 
-    adjustRTCIfNeeded(currentTime);
-    feedIfMealDue(currentTime);
+    if (adjustRTCIfNeeded(currentTime)) {
+      feedIfMealDue(currentTime);
+      delay(1000);
+    } else {
+      delay(FAIL_GET_TIME_DELAY);
+    }
+  } else {
+    delay(FAIL_GET_TIME_DELAY);
   }
 }

@@ -16,9 +16,9 @@ bool setCurrentTime(struct tm& toSet) {
   return isSet;
 }
 
-bool adjustRTC(struct tm& currentTime, bool isTimeInitialized) {
+bool adjustRTC(struct tm& currentTime) {
   // Essayez de vous connecter au serveur NTP
-  bool timeIsSet = isTimeInitialized;
+  bool isAdjusted = false;
   if (!Ping.ping(NTP_SERVER)) {
     signalError("ANTP");
   } else {
@@ -27,20 +27,25 @@ bool adjustRTC(struct tm& currentTime, bool isTimeInitialized) {
     setenv("TZ", ESTERN_TZ, 1);
     tzset();
 
-    if (isTimeInitialized) {
+    if(setCurrentTime(currentTime)) {
       lastRTCAdjustment = static_cast<uint8_t>(currentTime.tm_mon);
-    } else if(setCurrentTime(currentTime)) {
-      lastRTCAdjustment = static_cast<uint8_t>(currentTime.tm_mon);
-      isTimeInitialized =true;
+      isAdjusted = true;
+    } else {
+      signalError("ATME");
     }
   }
-  return timeIsSet;
+  return isAdjusted;
 }
 
-void adjustRTCIfNeeded(struct tm& currentTime) {
+bool adjustRTCIfNeeded(struct tm& currentTime) {
+  bool isAdjusted = true;
   if (lastRTCAdjustment != currentTime.tm_mon) {
-    adjustRTC(currentTime, true);
+    isAdjusted = adjustRTC(currentTime);
+    if (isAdjusted) {
+      logAction("RTC!");
+    }
   }
+  return isAdjusted;
 }
 
 void setTimestampString(char toSet[DATE_LENGTH]) {

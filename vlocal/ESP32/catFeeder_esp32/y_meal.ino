@@ -1,3 +1,7 @@
+const char* MEAL_HOUR_KEY = "mealHour";
+const char* OPEN_TIME_KEY = "openTime";
+const uint8_t MEAL_BODY_SIZE = 64;
+
 struct scheduledMeal {
   uint8_t mealHour;
   ushort openTime;
@@ -8,11 +12,12 @@ struct dailyMeal {
   uint8_t lastServedDay;
 };
 
-const char* MEAL_HOUR_KEY = "mealHour";
-const char* OPEN_TIME_KEY = "openTime";
-
 size_t mealCount;
 dailyMeal_t* meals;
+
+void loadMealFromFlash(struct tm& currentTime) {
+  loadMealFromFlash(currentTime, &meals, mealCount);
+}
 
 bool isMealHourDue(scheduledMeal_t& toCheckIfDue, struct tm& currentTime) {
   return currentTime.tm_hour >= toCheckIfDue.mealHour;
@@ -42,6 +47,8 @@ void addMeal(scheduledMeal_t& toAdd, struct tm& currentTime) {
   delete[] meals;
   meals = withAddedMeal;
   mealCount++;
+
+  saveMealsToFlash(meals, mealCount);
 }
 
 bool removeMeal(uint8_t mealHour) {
@@ -51,6 +58,7 @@ bool removeMeal(uint8_t mealHour) {
       memmove(meals + i, meals + i + 1, (mealCount - i - 1) * sizeof(dailyMeal_t));
       mealCount--;
       isRemoved = true;
+      saveMealsToFlash(meals, mealCount);
       break;
     }
   }
@@ -137,32 +145,4 @@ void handleGetMeal(AsyncWebServerRequest *request) {
   } else {
     request->send(204);
   }
-}
-
-void loadMealFromFlash(struct tm& currentTime) {
-    flash.begin(FS_GROUP, false);
-    size_t mealCount_;
-
-    if (flash.isKey(FS_MEAL_NB)) {
-      flash.getBytes(FS_MEAL_NB, &mealCount_, sizeof(mealCount_));
-    } else {
-      mealCount_ = 0;
-    }
-
-    if (mealCount_ > 0) {
-      if (flash.isKey(FS_MEAL_NB)) {
-        scheduledMeal_t scheduledMeals_[mealCount_];
-        dailyMeal_t meals_[mealCount_];
-        flash.getBytes(FS_MEALS, scheduledMeals_, sizeof(scheduledMeal_t) * mealCount_);
-        for (size_t i =0; i<mealCount_; i++) {
-          meals_[i].meal = scheduledMeals_[i];
-          meals_[i].lastServedDay = makeLastServed(scheduledMeals_[i], currentTime);
-        }
-        meals = meals_;
-      } else {
-        mealCount_ = 0;
-      }
-    }
-    mealCount = mealCount_;
-    flash.end();
 }
